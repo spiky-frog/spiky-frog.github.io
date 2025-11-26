@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="referrer" content="no-referrer-when-downgrade">
 <title>SubscriptionsTube</title>
 <style>
   body {
@@ -162,6 +161,20 @@
     float: right;
     cursor: pointer;
   }
+  .open-youtube-btn {
+    background-color: red;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    width: 100%;
+  }
+  .open-youtube-btn:hover {
+    background-color: #cc0000;
+  }
 </style>
 </head>
 <body>
@@ -183,7 +196,7 @@
 <div class="modal" id="videoModal">
   <div class="modal-content">
     <button class="close-btn" id="closeModal">✕</button>
-    <iframe id="player" src="" frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
+    <div id="videoPlayerContainer"></div>
   </div>
 </div>
 
@@ -241,9 +254,7 @@ function parseRssXml(xmlString) {
     const author = authorNode ? authorNode.textContent : "Unknown";
     const thumbNode = item.querySelector("media\\:thumbnail, thumbnail, enclosure[type^=image]");
     const thumbnail = thumbNode ? (thumbNode.getAttribute("url") || thumbNode.getAttribute("href")) : "";
-    // YouTube channel avatar
-    const avatarUrl = `https://www.youtube.com/ytc/creators_avatar/${author.replace(/\s+/g,'_')}.jpg`; // fallback placeholder
-    return { videoId, title, link, author, thumbnail, avatarUrl };
+    return { videoId, title, link, author, thumbnail };
   });
 }
 
@@ -285,16 +296,54 @@ function openVideo(id) {
     alert("Sorry, the video ID for this item could not be found.");
     return;
   }
-  const player = document.getElementById("player");
-  // When hosted on a live domain, the origin must be specified for the player to work.
-  const origin = window.location.origin;
-  player.src = `https://www.youtube.com/embed/${id}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(origin)}`;
+  
+  const container = document.getElementById("videoPlayerContainer");
+  
+  // Try to embed first
+  const isLocalOrGithubPages = window.location.hostname === 'localhost' || 
+                                window.location.hostname.includes('github.io') ||
+                                window.location.hostname === '';
+  
+  if (isLocalOrGithubPages) {
+    // For GitHub Pages and local testing, provide a direct link instead
+    container.innerHTML = `
+      <p style="margin-bottom: 15px;">Due to YouTube's embed restrictions on GitHub Pages, click below to watch on YouTube:</p>
+      <button class="open-youtube-btn" onclick="window.open('https://www.youtube.com/watch?v=${id}', '_blank')">
+        ▶ Open Video on YouTube
+      </button>
+    `;
+  } else {
+    // Try embedding for other domains
+    const origin = encodeURIComponent(window.location.origin);
+    container.innerHTML = `
+      <iframe 
+        src="https://www.youtube.com/embed/${id}?autoplay=1&modestbranding=1&rel=0" 
+        width="100%" 
+        height="450" 
+        frameborder="0" 
+        allowfullscreen 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+      </iframe>
+      <button class="open-youtube-btn" onclick="window.open('https://www.youtube.com/watch?v=${id}', '_blank')" style="margin-top: 10px;">
+        Open on YouTube (if embed fails)
+      </button>
+    `;
+  }
+  
   document.getElementById("videoModal").classList.add("active");
 }
 
 document.getElementById("closeModal").addEventListener("click", () => {
   document.getElementById("videoModal").classList.remove("active");
-  document.getElementById("player").src = "";
+  document.getElementById("videoPlayerContainer").innerHTML = "";
+});
+
+// Close modal on escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    document.getElementById("videoModal").classList.remove("active");
+    document.getElementById("videoPlayerContainer").innerHTML = "";
+  }
 });
 
 // Fetch feed on load
