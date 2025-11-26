@@ -193,7 +193,7 @@ async function initializeFeed() {
   // 2. Fetch fresh data from the network
   try {
     const fetchPromises = FEED_URLS.map(url => {
-      const finalUrl = USE_PROXY ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
+      const finalUrl = USE_PROXY ? `https://corsproxy.io/?${encodeURIComponent(url)}` : url;
       return fetch(finalUrl).then(res => {
         if (!res.ok) throw new Error(`Failed to fetch feed: ${url}`);
         return res.text();
