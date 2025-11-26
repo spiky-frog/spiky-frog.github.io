@@ -188,7 +188,11 @@
 </div>
 
 <script>
-const FEED_URL = "https://www.youtube.com/feeds/videos.xml?channel_id=UCGudGqToOw9hWGR88W9Jutg";
+const FEED_URLS = [
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCGudGqToOw9hWGR88W9Jutg", // Google for Developers
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCBJycsmduvYEL83R_U4JriQ", // MKBHD
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCXuqSBlHAE6Xw-yeJA0Tunw", // Linus Tech Tips
+];
 const USE_PROXY = true;
 
 const mainContainer = document.getElementById("videos");
@@ -209,14 +213,20 @@ function showSkeleton(count = 8) {
   }
 }
 
-async function fetchFeed(url) {
+async function fetchFeeds(urls) {
   try {
     showSkeleton();
-    const finalUrl = USE_PROXY ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
-    const res = await fetch(finalUrl);
-    if (!res.ok) throw new Error("Failed to fetch feed");
-    const text = await res.text();
-    const videos = parseRssXml(text);
+    const fetchPromises = urls.map(url => {
+      const finalUrl = USE_PROXY ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
+      return fetch(finalUrl).then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch feed: ${url}`);
+        return res.text();
+      });
+    });
+
+    const xmlStrings = await Promise.all(fetchPromises);
+    const videos = xmlStrings.flatMap(parseRssXml).sort((a, b) => b.published - a.published);
+
     renderChannels(videos);
     renderVideos(videos);
   } catch (err) {
@@ -246,8 +256,10 @@ function parseRssXml(xmlString) {
     const thumbNode = item.querySelector("media\\:thumbnail, thumbnail, enclosure[type^=image]");
     const thumbnail = thumbNode ? (thumbNode.getAttribute("url") || thumbNode.getAttribute("href")) : "";
     // YouTube channel avatar
+    const publishedNode = item.querySelector("published, pubDate");
+    const published = publishedNode ? new Date(publishedNode.textContent) : new Date(0);
     const avatarUrl = `https://www.youtube.com/ytc/creators_avatar/${author.replace(/\s+/g,'_')}.jpg`; // fallback placeholder
-    return { videoId, title, link, author, thumbnail, avatarUrl };
+    return { videoId, title, link, author, thumbnail, avatarUrl, published };
   });
 }
 
@@ -302,7 +314,7 @@ document.getElementById("closeModal").addEventListener("click", () => {
 });
 
 // Fetch feed on load
-fetchFeed(FEED_URL);
+fetchFeeds(FEED_URLS);
 </script>
 
 </body>
