@@ -230,9 +230,13 @@ function parseRssXml(xmlString) {
   const doc = parser.parseFromString(xmlString, "application/xml");
   const items = Array.from(doc.querySelectorAll("item, entry"));
 
-  return items.map(item => {
+  return items.map(item => {    
     const videoIdNode = item.querySelector("yt\\:videoId");
-    const videoId = videoIdNode ? videoIdNode.textContent : null;
+    let videoId = videoIdNode ? videoIdNode.textContent : null;
+    if (!videoId) {
+      const idNode = item.querySelector("id");
+      if (idNode) videoId = idNode.textContent.split(":").pop();
+    }
     const titleNode = item.querySelector("title");
     const title = titleNode ? titleNode.textContent : "(no title)";
     const linkNode = item.querySelector("link");
