@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer-when-downgrade">
+<title>SubscriptionsTube</title>
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #111;
+    color: #fff;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid #333;
+  }
+  header .title {
+    font-size: 24px;
+    font-weight: bold;
+    color: red;
+  }
+  .container {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 20px auto;
+  }
+  aside {
+    background-color: #222;
+    border-radius: 10px;
+    padding: 10px;
+    height: fit-content;
+  }
+  aside h4 {
+    margin-top: 0;
+  }
+  aside .channel {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  aside .channel .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    overflow: hidden;
+  }
+  aside .channel .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  main {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 15px;
+  }
+  .video-card {
+    background-color: #222;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    animation: fadeIn 0.3s ease;
+  }
+  .video-card img {
+    width: 100%;
+    display: block;
+  }
+  .video-card .info {
+    padding: 10px;
+  }
+  .video-card .info h3 {
+    font-size: 14px;
+    margin: 0 0 5px 0;
+  }
+  .video-card .info p {
+    font-size: 12px;
+    color: #aaa;
+    margin: 0;
+  }
+
+  /* Skeleton */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: #333;
+    border-radius: 6px;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -150px;
+    height: 100%;
+    width: 150px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: shimmer 1.2s infinite;
+  }
+  .skeleton-thumb {
+    width: 100%;
+    padding-top: 56.25%;
+  }
+  .skeleton-title {
+    height: 14px;
+    margin: 10px 0 5px 0;
+  }
+  .skeleton-author {
+    height: 12px;
+    width: 60%;
+  }
+
+  @keyframes shimmer {
+    0% { left: -150px; }
+    100% { left: 100%; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  .modal.active {
+    display: flex;
+  }
+  .modal-content {
+    background-color: #111;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 800px;
+    width: 90%;
+  }
+  .modal-content iframe {
+    width: 100%;
+    height: 450px;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    float: right;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">YouTube</div>
+  <div>Subscriptions</div>
+</header>
+
+<div class="container">
+  <aside>
+    <h4>Channels</h4>
+    <div id="channels"></div>
+  </aside>
+  <main id="videos"></main>
+</div>
+
+<!-- Modal for video player -->
+<div class="modal" id="videoModal">
+  <div class="modal-content">
+    <button class="close-btn" id="closeModal">✕</button>
+    <iframe id="player" src="" frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
+  </div>
+</div>
+
+<script>
+const FEED_URL = "https://www.youtube.com/feeds/videos.xml?channel_id=UCGudGqToOw9hWGR88W9Jutg";
+const USE_PROXY = true;
+
+const mainContainer = document.getElementById("videos");
+
+function showSkeleton(count = 8) {
+  mainContainer.innerHTML = "";
+  for (let i = 0; i < count; i++) {
+    const skeleton = document.createElement("div");
+    skeleton.className = "video-card";
+    skeleton.innerHTML = `
+      <div class="skeleton skeleton-thumb"></div>
+      <div class="info">
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-author"></div>
+      </div>
+    `;
+    mainContainer.appendChild(skeleton);
+  }
+}
+
+async function fetchFeed(url) {
+  try {
+    showSkeleton();
+    const finalUrl = USE_PROXY ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
+    const res = await fetch(finalUrl);
+    if (!res.ok) throw new Error("Failed to fetch feed");
+    const text = await res.text();
+    const videos = parseRssXml(text);
+    renderChannels(videos);
+    renderVideos(videos);
+  } catch (err) {
+    console.error(err);
+    mainContainer.innerHTML = `<p style="color:red;">Error loading feed: ${err.message}</p>`;
+  }
+}
+
+function parseRssXml(xmlString) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlString, "application/xml");
+  const items = Array.from(doc.querySelectorAll("item, entry"));
+
+  return items.map(item => {
+    const videoIdNode = item.querySelector("yt\\:videoId");
+    const videoId = videoIdNode ? videoIdNode.textContent : null;
+    const titleNode = item.querySelector("title");
+    const title = titleNode ? titleNode.textContent : "(no title)";
+    const linkNode = item.querySelector("link");
+    let link = linkNode ? (linkNode.getAttribute("href") || linkNode.textContent) : null;
+    const authorNode = item.querySelector("author > name, dc\\:creator");
+    const author = authorNode ? authorNode.textContent : "Unknown";
+    const thumbNode = item.querySelector("media\\:thumbnail, thumbnail, enclosure[type^=image]");
+    const thumbnail = thumbNode ? (thumbNode.getAttribute("url") || thumbNode.getAttribute("href")) : "";
+    // YouTube channel avatar
+    const avatarUrl = `https://www.youtube.com/ytc/creators_avatar/${author.replace(/\s+/g,'_')}.jpg`; // fallback placeholder
+    return { videoId, title, link, author, thumbnail, avatarUrl };
+  });
+}
+
+function renderChannels(videos) {
+  const container = document.getElementById("channels");
+  const authors = [...new Set(videos.map(v => v.author))];
+  container.innerHTML = authors.map(author => {
+    const video = videos.find(v => v.author === author);
+    return `
+      <div class="channel">
+        <div class="avatar">
+          ${video.thumbnail ? `<img src="${video.thumbnail}" alt="${author}">` : author[0]}
+        </div>
+        <div>${author}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderVideos(videos) {
+  mainContainer.innerHTML = videos.map(video => `
+    <div class="video-card" data-video-id="${video.videoId}">
+      <img src="${video.thumbnail}" alt="${video.title}" loading="lazy" />
+      <div class="info">
+        <h3>${video.title}</h3>
+        <p>${video.author}</p>
+      </div>
+    </div>
+  `).join("");
+
+  document.querySelectorAll(".video-card").forEach(card => {
+    card.addEventListener("click", () => openVideo(card.dataset.videoId));
+  });
+}
+
+function openVideo(id) {
+  if (!id) {
+    console.error("Could not get video ID for this item.");
+    alert("Sorry, the video ID for this item could not be found.");
+    return;
+  }
+  const player = document.getElementById("player");
+  player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&modestbranding=1&rel=0`;
+  document.getElementById("videoModal").classList.add("active");
+}
+
+document.getElementById("closeModal").addEventListener("click", () => {
+  document.getElementById("videoModal").classList.remove("active");
+  document.getElementById("player").src = "";
+});
+
+// Fetch feed on load
+fetchFeed(FEED_URL);
+</script>
+
+</body>
+</html>
