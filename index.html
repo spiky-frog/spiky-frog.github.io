@@ -286,7 +286,9 @@ function openVideo(id) {
     return;
   }
   const player = document.getElementById("player");
-  player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&modestbranding=1&rel=0`;
+  // When hosted on a live domain, the origin must be specified for the player to work.
+  const origin = window.location.protocol === 'file:' ? 'null' : window.location.origin;
+  player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&modestbranding=1&rel=0&origin=${encodeURIComponent(origin)}`;
   document.getElementById("videoModal").classList.add("active");
 }
 
