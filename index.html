@@ -271,8 +271,13 @@ function openVideo(id) {
   }
   const player = document.getElementById("player");
   // When hosted on a live domain, the origin must be specified for the player to work.
-  const origin = window.location.protocol + "//" + window.location.host;
-  player.src = `https://www.youtube.com/embed/${id}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(origin)}`;
+  // For local development, window.location.host can be empty. We only add the origin parameter if the host exists.
+  let playerSrc = `https://www.youtube.com/embed/${id}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1`;
+  if (window.location.host) {
+    const origin = window.location.protocol + "//" + window.location.host;
+    playerSrc += `&origin=${encodeURIComponent(origin)}`;
+  }
+  player.src = playerSrc;
   document.getElementById("videoModal").classList.add("active");
 }
 
