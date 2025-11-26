@@ -188,7 +188,11 @@
 </div>
 
 <script>
-const FEED_URL = "https://www.youtube.com/feeds/videos.xml?channel_id=UCGudGqToOw9hWGR88W9Jutg";
+const FEED_URLS = [
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCGudGqToOw9hWGR88W9Jutg",
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCBj2g01d6Ggj8q8YnF1zO7w", // MKBHD
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCJ2PGeOh_G-8gHL9CRo9a_w"  // Coder Coder
+];
 const USE_PROXY = true;
 
 const mainContainer = document.getElementById("videos");
@@ -209,14 +213,20 @@ function showSkeleton(count = 8) {
   }
 }
 
-async function fetchFeed(url) {
+async function fetchAllFeeds() {
   try {
     showSkeleton();
-    const finalUrl = USE_PROXY ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
-    const res = await fetch(finalUrl);
-    if (!res.ok) throw new Error("Failed to fetch feed");
-    const text = await res.text();
-    const videos = parseRssXml(text);
+    const fetchPromises = FEED_URLS.map(url => {
+      const finalUrl = USE_PROXY ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
+      return fetch(finalUrl).then(res => res.ok ? res.text() : Promise.reject(`Failed to fetch ${url}`));
+    });
+
+    const xmlStrings = await Promise.all(fetchPromises);
+    const allVideos = xmlStrings.flatMap(xml => parseRssXml(xml));
+    
+    // Sort videos by publication date, newest first
+    const videos = allVideos.sort((a, b) => b.published - a.published);
+
     renderChannels(videos);
     renderVideos(videos);
   } catch (err) {
@@ -245,9 +255,11 @@ function parseRssXml(xmlString) {
     const author = authorNode ? authorNode.textContent : "Unknown";
     const thumbNode = item.querySelector("media\\:thumbnail, thumbnail, enclosure[type^=image]");
     const thumbnail = thumbNode ? (thumbNode.getAttribute("url") || thumbNode.getAttribute("href")) : "";
+    const publishedNode = item.querySelector("published, pubDate");
+    const published = publishedNode ? new Date(publishedNode.textContent) : new Date();
     // YouTube channel avatar
     const avatarUrl = `https://www.youtube.com/ytc/creators_avatar/${author.replace(/\s+/g,'_')}.jpg`; // fallback placeholder
-    return { videoId, title, link, author, thumbnail, avatarUrl };
+    return { videoId, title, link, author, thumbnail, avatarUrl, published };
   });
 }
 
@@ -302,7 +314,7 @@ document.getElementById("closeModal").addEventListener("click", () => {
 });
 
 // Fetch feed on load
-fetchFeed(FEED_URL);
+fetchAllFeeds();
 </script>
 
 </body>
